@@ -105,7 +105,7 @@ def main():
 
         elif choice == '3':  # view the table structure and all the data
 
-            print(schemaObj.headObj.tableNames)
+            schemaObj.viewTableNames() # view all the table names in the schema file
             table_name = input('please input the name of the table to be displayed:')
             if isinstance(table_name,str):
                 table_name=table_name.encode('utf-8')

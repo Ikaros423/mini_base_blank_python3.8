@@ -93,16 +93,27 @@ class Schema(object):
     #       table_name
     #------------------------------
     def viewTableStructure(self, table_name):
-        print('the structure of table '.encode('utf-8')+table_name+' is as follows:'.encode('utf-8'))
-        '''
-        tmp=[]
-        for i in range(len(self.headObj.tableNames)):
-            if self.headObj.tableNames[i][0] == table_name:
-                tmp = [j.strip() for j in self.headObj.tableFields[i]]
-                print '|'.join(tmp)
-                return tmp
-        '''
-        # to be inserted here
+        print('the structure of table {} is as follows:'.format(table_name))
+        # 获取字段信息
+
+        fields = self.headObj.tableFields.get(table_name.strip(), [])
+        print(fields)
+        if not fields:
+            print("Table not found or has no fields.")
+            return
+
+        # 字段类型映射
+        type_map = {0: 'str', 1: 'varstr', 2: 'int', 3: 'bool'}
+        print(f"{'Field Name':<15}{'Type':<10}{'Length':<10}")
+        print('-' * 35)
+        for field in fields:
+            # 处理字段名
+            if isinstance(field[0], bytes):
+                field_name = field[0].decode('utf-8').strip()
+
+            field_type = type_map.get(field[1], str(field[1]))
+            field_length = field[2]
+            print(f"{field_name:<15}{field_type:<10}{field_length:<10}")
 
     # ------------------------------------------------
     # constructor of the class
@@ -259,7 +270,7 @@ class Schema(object):
                 if len(fieldName.strip())<10:
                     if isinstance(fieldName,str):
                         fieldName=fieldName.encode('utf-8')
-                    filledFieldName = (' ' * (MAX_FIELD_LEN - len(fieldName.strip()))).encode('utf-8') + fieldName
+                    filledFieldName = (' ' * (MAX_FIELD_NAME_LEN - len(fieldName.strip()))).encode('utf-8') + fieldName.strip()
                 if isinstance(filledFieldName,str):
                     filledFieldName=filledFieldName.encode('utf-8')
                 struct.pack_into('!10sii', fieldBuff, beginIndex, filledFieldName,int(fieldType),int(fieldLength))

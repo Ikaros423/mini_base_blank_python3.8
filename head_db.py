@@ -48,4 +48,4 @@ class Header(object):
             print ("the length of tableNames is",len(self.tableNames))
             for i in range(len(self.tableNames)):
                 print(self.tableNames[i])
-                print (self.tableFields[i])
+                print(self.tableFields[i])
