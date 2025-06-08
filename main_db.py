@@ -21,7 +21,7 @@ import parser_db  # for yacc, where ddata is tored in binary format
 import common_db  # the global variables, functions, constants in the program
 import query_plan_db  # construct the query plan and execute it
 
-PROMPT_STR = 'Input your choice  \n1:add a new table structure and data \n2:delete a table structure and data\
+PROMPT_STR = '\nInput your choice  \n1:add a new table structure and data \n2:delete a table structure and data\
 \n3:view a table structure and data \n4:delete all tables and data \n5:select from where clause\
 \n6:delete a row according to field keyword \n7:update a row according to field keyword \n. to quit):\n'
 
@@ -160,11 +160,30 @@ def main():
 
         elif choice == '6':  # delete a line of data from the storage file given the keyword
 
+            schemaObj.viewTableNames() # view all the table names in the schema file
             table_name = input('please input the name of the table to be deleted from:')
-            field_name = input('please input the field name and the corresponding keyword (fieldname:keyword):')
+            
             # to the students: to be inserted here, delete the line from data files
+            if isinstance(table_name,str):
+                table_name=table_name.encode('utf-8')
+            if table_name.strip():
+                if schemaObj.find_table(table_name.strip()):
+                    dataObj = storage_db.Storage(table_name)  # create an object for the data of table
+                    dataObj.show_table_data()  # view all the data of the table
+                    
+                    field_keyword = input('please input the field name and the corresponding keyword (fieldname:keyword):')
+                    if dataObj.delete_record(field_keyword):
+                        print('delete record success!')
+                        dataObj.show_table_data()  # view all the data of the table
+                    else:
+                        print('delete record fail!')
+
+                    del dataObj
+                else:
+                    print('table name is None')
 
             choice = input(PROMPT_STR)
+
 
         elif choice == '7':  # update a line of data given the keyword
 
@@ -181,6 +200,10 @@ def main():
             print('main loop finishies')
             del schemaObj
             break
+
+        else:
+            print('Wrong input! Please input again!')
+            choice = input(PROMPT_STR)
 
     print('main loop finish!')
 

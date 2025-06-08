@@ -49,6 +49,7 @@ from common_db import BLOCK_SIZE
 # pointer                     #offset of table schema in block id 0
 # length of record            # including record head and record content
 # time stamp of last update  # for example,1999-08-22
+# is_deleted flag         # 0 means not deleted, 1 means deleted
 # field_0_value
 # field_1_value
 # ...
@@ -59,6 +60,7 @@ from common_db import BLOCK_SIZE
 import struct
 import os
 import ctypes
+import tool
 
 
 # --------------------------------------------
@@ -79,6 +81,7 @@ class Storage(object):
 
         self.record_list = []
         self.record_Position = []
+        self.delete_flag_list= []  # to judge whether the record is deleted or not
 
         if not os.path.exists(tablename + '.dat'.encode('utf-8')):  # the file corresponding to the table does not exist
             print('table file '.encode('utf-8') + tablename + '.dat does not exists'.encode('utf-8'))
@@ -146,6 +149,12 @@ class Storage(object):
                 self.f_handle.write(self.dir_buf)
                 self.f_handle.flush()
 
+            else:
+                print('the number of fields should be greater than 0')
+                self.f_handle.close()
+                self.open = False
+                return
+
         else:  # there is something in the file
 
             self.block_id, self.data_block_num, self.num_of_fields = struct.unpack_from('!iii', self.dir_buf, 0)
@@ -164,7 +173,7 @@ class Storage(object):
                 self.field_name_list.append(temp_tuple)
                 print("the " + str(i) + "th field information (field name,field type,field length) is ", temp_tuple)
         # print self.field_name_list
-        record_head_len = struct.calcsize('!ii10s')
+        record_head_len = struct.calcsize('!ii10si')
         record_content_len = sum(map(lambda x: x[2], self.field_name_list))
         # print record_content_len
 
@@ -178,23 +187,37 @@ class Storage(object):
             if self.Number_of_Records > 0:
                 for i in range(self.Number_of_Records):
                     self.record_Position.append((Flag, i))
-                    offset = \
-                        struct.unpack_from('!i', self.active_data_buf,
-                                           struct.calcsize('!ii') + i * struct.calcsize('!i'))[
-                            0]
-                    record = struct.unpack_from('!' + str(record_content_len) + 's', self.active_data_buf,
-                                                offset + record_head_len)[0]
-                    tmp = 0
-                    tmpList = []
-                    for field in self.field_name_list:
-                        t = record[tmp:tmp + field[2]].strip()
-                        tmp = tmp + field[2]
-                        if field[1] == 2:
-                            t = int(t)
-                        if field[1] == 3:
-                            t = bool(t)
-                        tmpList.append(t)
-                    self.record_list.append(tuple(tmpList))
+
+                    # 获取记录偏移量
+                    offset = struct.unpack_from('!i', self.active_data_buf,
+                                    struct.calcsize('!ii') + i * struct.calcsize('!i'))[0]
+            
+                    # 读取记录头部，检查删除标记
+                    record_header = struct.unpack_from('!ii10si', self.active_data_buf, offset)
+                    is_deleted = record_header[3]  # 第4个字段是删除标记
+            
+                    if not is_deleted:  # 只处理未删除的记录
+                        self.delete_flag_list.append(False)  # 未删除标记为False
+                        # 读取记录内容
+                        record = struct.unpack_from('!' + str(record_content_len) + 's', 
+                                          self.active_data_buf,
+                                          offset + record_head_len)[0]
+                
+                        # 解析记录内容
+                        tmp = 0
+                        tmpList = []
+                        for field in self.field_name_list:
+                            t = record[tmp:tmp + field[2]].strip()
+                            tmp = tmp + field[2]
+                            if field[1] == 2:  # int类型
+                                t = int(t)
+                            if field[1] == 3:  # bool类型
+                                t = bool(t)
+                            tmpList.append(t)
+                        self.record_list.append(tuple(tmpList))
+                    else:
+                        self.delete_flag_list.append(True)
+                        self.record_list.append(None)  # 已删除的记录用None表示
             Flag += 1
 
     # ------------------------------
@@ -242,7 +265,7 @@ class Storage(object):
 
         # Step3: To calculate MaxNum in each Data Blocks
         record_content_len = len(inputstr)
-        record_head_len = struct.calcsize('!ii10s')
+        record_head_len = struct.calcsize('!ii10si')  # 增加is_deleted字段
         record_len = record_head_len + record_content_len
         MAX_RECORD_NUM = (BLOCK_SIZE - struct.calcsize('!i') - struct.calcsize('!ii')) / (
                 record_len + struct.calcsize('!i'))
@@ -290,25 +313,76 @@ class Storage(object):
         update_time = '2016-11-16'  # update time
         self.f_handle.seek(BLOCK_SIZE * last_Position[0] + beginIndex)
         self.buf = ctypes.create_string_buffer(record_len)
-        struct.pack_into('!ii10s', self.buf, 0, record_schema_address, record_content_len, update_time.encode('utf-8'))
+        struct.pack_into('!ii10si', self.buf, 0, record_schema_address, record_content_len, update_time.encode('utf-8'), 0)  # 0表示未删除
         struct.pack_into('!' + str(record_content_len) + 's', self.buf, record_head_len, inputstr.encode('utf-8'))
         self.f_handle.write(self.buf.raw)
         self.f_handle.flush()
 
         return True
 
-    # ------------------------------
-    # show the data structure and its data
+    # --------------------------------
+    # to delete a record into table
     # input:
-    #       t
-    # -------------------------------------
+    #       field_keyword
+    # return: True or False
+    # -------------------------------
+    def delete_record(self, field_name):
+        """删除记录，参数格式为 fieldname:keyword"""
+        if ':' not in field_name:
+            print('\033[31m参数格式错误，应为 fieldname:keyword\033[0m')
+            return False
+
+        fname, keyword = field_name.split(':', 1)
+        # 确保字段名是bytes类型
+        fname = tool.tryToBytes(fname)
+        # keyword可以是字符串或数字，转换为字符串
+        keyword = tool.tryToStr(keyword)
+
+        # 找到字段索引
+        field_idx = -1
+        for idx, field in enumerate(self.field_name_list):
+            name = tool.convertType(fname, field[0])
+            if name == fname:
+                field_idx = idx
+                break
+
+        if field_idx == -1:
+            print(f'\033[31m未找到字段名 {fname.decode()}\033[0m')
+            return False
+
+        deleted_count = 0
+        # 遍历所有记录
+        for i, rec in enumerate(self.record_list):
+            if rec is None:  # 跳过已删除的记录
+                continue
+            record_value = tool.convertType(keyword, rec[field_idx])
+            if record_value == keyword:
+                # 获取记录在文件中的位置
+                block_id, record_id = self.record_Position[i]
+                # 计算记录头的位置
+                offset = struct.unpack_from('!i', self.active_data_buf,
+                                          struct.calcsize('!ii') + record_id * struct.calcsize('!i'))[0]
+                # 设置删除标记
+                self.f_handle.seek(BLOCK_SIZE * block_id + offset + struct.calcsize('!ii10s'))
+                self.f_handle.write(struct.pack('!i', 1))  # 1表示已删除
+                self.delete_flag_list[i] = True  # 更新内存中的删除标记
+                deleted_count += 1
+
+        if deleted_count > 0:
+            print(f'\033[32m成功删除 {deleted_count} 条记录\033[0m')
+            self.f_handle.flush()
+            return True
+        else:
+            print('\033[33m未找到匹配的记录\033[0m')
+            return False
 
     def show_table_data(self):
         print('|    '.join(map(lambda x: x[0].decode('utf-8').strip(), self.field_name_list)))  # show the structure
 
         # the following is to show the data of the table
-        for record in self.record_list:
-            print(record)
+        for record, is_deleted in list(zip(self.record_list, self.delete_flag_list)):
+            if not is_deleted:
+                print(record)
 
     # --------------------------------
     # to delete  the data file

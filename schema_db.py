@@ -12,6 +12,7 @@
 import ctypes
 import struct
 import head_db # it is main memory structure for the table schema
+import tool 
 
 
 
@@ -97,7 +98,6 @@ class Schema(object):
         # 获取字段信息
 
         fields = self.headObj.tableFields.get(table_name.strip(), [])
-        print(fields)
         if not fields:
             print("Table not found or has no fields.")
             return
@@ -108,8 +108,9 @@ class Schema(object):
         print('-' * 35)
         for field in fields:
             # 处理字段名
+            field_name = field[0].strip()
             if isinstance(field[0], bytes):
-                field_name = field[0].decode('utf-8').strip()
+                field_name = field_name.decode('utf-8')
 
             field_type = type_map.get(field[1], str(field[1]))
             field_length = field[2]
@@ -236,7 +237,7 @@ class Schema(object):
     # delete all the contents in the schema file
     # ----------------------------------------
     def deleteAll(self):
-        self.headObj.tableFields=[]
+        self.headObj.tableFields={}
         self.headObj.tableNames=[]
         self.fileObj.seek(0)
         self.fileObj.truncate(0)
@@ -303,7 +304,8 @@ class Schema(object):
             self.headObj.offsetOfBody += fieldNum * MAX_FIELD_LEN
             self.headObj.tableNames.append(nameContent)
             # fieldTuple = tuple(fieldList)
-            self.headObj.tableFields[tableName.strip()]=fieldList
+            tableName = tool.tryToStr(tableName)  # convert to string if it is bytes
+            self.headObj.tableFields[tableName]=fieldList
 
     # -------------------------------
     # to determine whether the table named table_name exist, depending on the main memory structures
@@ -337,17 +339,22 @@ class Schema(object):
         #isStored, tempTableNum, tempOffset = struct.unpack_from('!?ii', buf,0)  # link:https://docs.python.org/2/library/struct.html
         #print isStored,tempTableNum,tempOffset
         for idx in range(len(self.headObj.tableNames)):
-            tmp_tableName = self.headObj.tableNames[idx][0]
+            tmp_tableName = tool.tryToStr(self.headObj.tableNames[idx][0])
             if len(tmp_tableName)<10:
                 tmp_tableName = ' ' * (10 - len(tmp_tableName.strip())) + tmp_tableName
 
             # write (tablename,numberoffields,offsetinbody) to buffer
+            tmp_tableName = tmp_tableName.encode('utf-8') if isinstance(tmp_tableName, str) else tmp_tableName
             struct.pack_into('!10sii', buf, META_HEAD_SIZE + idx * TABLE_NAME_ENTRY_LEN, tmp_tableName,
                              self.headObj.tableNames[idx][1],self.headObj.tableNames[idx][2])
 
+            # 使用表名作为键来访问tableFields
+            table_name = self.headObj.tableNames[idx][0].strip()
+            fields = self.headObj.tableFields[table_name]
+            
             # write the field information of each table into the buffer
             for idj in range(self.headObj.tableNames[idx][1]):
-                (tempFieldName,tempFieldType,tempFieldLength)=self.headObj.tableFields[idx][idj]                
+                (tempFieldName,tempFieldType,tempFieldLength) = fields[idj]
                 struct.pack_into('!10sii',buf,self.headObj.tableNames[idx][2]+idj*MAX_FIELD_LEN,
                                 tempFieldName,tempFieldType,tempFieldLength)
         self.fileObj.seek(0)
@@ -377,15 +384,15 @@ class Schema(object):
 
             
             if len(self.headObj.tableNames)>0: # there is at least one table after the deletion
-                name_list = map(lambda x: x[0], self.headObj.tableNames)
-                field_num_per_table = map(lambda x: x[1], self.headObj.tableNames)
+                name_list = list(map(lambda x: x[0], self.headObj.tableNames))
+                field_num_per_table = list(map(lambda x: x[1], self.headObj.tableNames))
                 table_offset= list(map(lambda x: x[2], self.headObj.tableNames))
 
                 table_offset[0] = BODY_BEGIN_INDEX
                 for idx in range(1,len(table_offset)):
                     table_offset[idx] = table_offset[idx-1] + field_num_per_table[idx-1]*MAX_FIELD_LEN
                     
-                self.headObj.tableNames=zip(name_list,field_num_per_table,table_offset)
+                self.headObj.tableNames=list(zip(name_list,field_num_per_table,table_offset))
                 self.headObj.offsetOfBody=self.headObj.tableNames[-1][2]+self.headObj.tableNames[-1][1]*MAX_FIELD_LEN
                 self.WriteBuff()
 
