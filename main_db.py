@@ -17,7 +17,7 @@ import storage_db  # the module to process the storage of instance
 
 import query_plan_db  # for SQL clause of which data is stored in binary format
 import lex_db  # for lex, where data is stored in binary format
-import parser_db  # for yacc, where ddata is tored in binary format
+import parser_db  # for yacc, where data is stored in binary format
 import common_db  # the global variables, functions, constants in the program
 import query_plan_db  # construct the query plan and execute it
 
@@ -43,7 +43,7 @@ def main():
     while True:
 
         if choice == '1':  # add a new table and lines of data
-            tableName = input('please enter your new table name:')
+            tableName = input(f'\033[34mplease enter your new table name:\033[0m')
             if isinstance(tableName, str):
                 tableName = tableName.encode('utf-8')
             #  tableName not in all.sch
@@ -62,14 +62,13 @@ def main():
                 record = []
                 Field_List = dataObj.getFieldList()
                 for x in Field_List:
-                    s = 'Input field name is: ' + str(x[0].strip()) + '  field type is: ' + str(x[1]) + \
-                        ' field maximum length is: ' + str(x[2]) + '\n'
+                    s = f'Input field name is: {x[0].strip()}  field type is: {x[1]} field maximum length is: {x[2]}\n'
                     record.append(input(s))
 
                 if dataObj.insert_record(record):  # add a row
-                    print('OK!')
+                    print(f'\033[32mOK!\033[0m')
                 else:
-                    print('Wrong input!')
+                    print(f'\033[31mWrong input!\033[0m')
 
                 del dataObj
 
@@ -81,7 +80,7 @@ def main():
 
         elif choice == '2':  # delete a table from schema file and data file
 
-            table_name = input('please input the name of the table to be deleted:')
+            table_name = input(f'\033[34mplease input the name of the table to be deleted:\033[0m')
             if isinstance(table_name,str):
                 table_name=table_name.encode('utf-8')
             if schemaObj.find_table(table_name.strip()):
@@ -92,11 +91,11 @@ def main():
                     del dataObj
 
                 else:
-                    print('the deletion from schema file fail')
+                    print(f'\033[31mthe deletion from schema file fail\033[0m')
 
 
             else:
-                print('there is no table '.encode('utf-8') + table_name + ' in the schema file'.encode('utf-8'))
+                print(f'\033[31mthere is no table {table_name} in the schema file\033[0m')
 
 
             choice = input(PROMPT_STR)
@@ -106,7 +105,7 @@ def main():
         elif choice == '3':  # view the table structure and all the data
 
             schemaObj.viewTableNames() # view all the table names in the schema file
-            table_name = input('please input the name of the table to be displayed:')
+            table_name = input(f'\033[34mplease input the name of the table to be displayed:\033[0m')
             if isinstance(table_name,str):
                 table_name=table_name.encode('utf-8')
             if table_name.strip():
@@ -117,7 +116,7 @@ def main():
                     dataObj.show_table_data()  # view all the data of the table
                     del dataObj
                 else:
-                    print('table name is None')
+                    print(f'\033[31mtable name is None\033[0m')
 
             choice = input(PROMPT_STR)
 
@@ -142,7 +141,7 @@ def main():
 
         elif choice == '5':  # process SELECT FROM WHERE clause
             print('#        Your Query is to SQL QUERY                  #')
-            sql_str = input('please enter the select from where clause:')
+            sql_str = input(f'\033[34mplease enter the select from where clause:\033[0m')
             lex_db.set_lex_handle()  # to set the global_lexer in common_db.py
             parser_db.set_handle()  # to set the global_parser in common_db.py
 
@@ -153,7 +152,7 @@ def main():
                 query_plan_db.construct_logical_tree()
                 query_plan_db.execute_logical_tree()
             except:
-                print('WRONG SQL INPUT!')
+                print(f'\033[31mWRONG SQL INPUT!\033[0m')
             print('#----------------------------------------------------#')
             choice = input(PROMPT_STR)
 
@@ -161,8 +160,8 @@ def main():
         elif choice == '6':  # delete a line of data from the storage file given the keyword
 
             schemaObj.viewTableNames() # view all the table names in the schema file
-            table_name = input('please input the name of the table to be deleted from:')
-            
+            table_name = input(f'\033[34mplease input the name of the table to be deleted from:\033[0m')
+
             # to the students: to be inserted here, delete the line from data files
             if isinstance(table_name,str):
                 table_name=table_name.encode('utf-8')
@@ -170,27 +169,52 @@ def main():
                 if schemaObj.find_table(table_name.strip()):
                     dataObj = storage_db.Storage(table_name)  # create an object for the data of table
                     dataObj.show_table_data()  # view all the data of the table
-                    
-                    field_keyword = input('please input the field name and the corresponding keyword (fieldname:keyword):')
+
+                    field_keyword = input(f'\033[34mplease input the field name and the corresponding keyword (fieldname:keyword):\033[0m')
                     if dataObj.delete_record(field_keyword):
-                        print('delete record success!')
+                        print(f'\033[32mdelete record success!\033[0m')
                         dataObj.show_table_data()  # view all the data of the table
                     else:
-                        print('delete record fail!')
+                        print(f'\033[31mdelete record fail!\033[0m')
 
                     del dataObj
                 else:
-                    print('table name is None')
+                    print(f'\033[33mtable name is None\033[0m')
 
             choice = input(PROMPT_STR)
 
 
         elif choice == '7':  # update a line of data given the keyword
 
-            table_name = input('please input the name of the table:')
-            field_name = input('please input the field name:')
-            field_name_value = input('please input the old value of the field:')
-            # to the students: to be inserted here, update the line according to the user input
+            schemaObj.viewTableNames()  # view all the table names in the schema file
+            table_name = input(f'\033[34mplease input the name of the table:\033[0m')
+            if isinstance(table_name, str):
+                table_name = table_name.encode('utf-8').strip()
+                if schemaObj.find_table(table_name.strip()):
+                    dataObj = storage_db.Storage(table_name)
+                    dataObj.show_table_data()
+                    field_keyword = input(f'\033[34mplease input the field name and the corresponding keyword (fieldname:keyword):\033[0m')
+                    if dataObj.delete_record(field_keyword):  # delete the record first
+                        print(f'\033[32mdelete old record success!\033[0m')
+
+                        record = []
+                        Field_List = dataObj.getFieldList()
+                        print(f'\033[34mPlease input the new record data:\033[0m')
+                        for x in Field_List:
+                            s = f'Input field name is: {x[0].strip()}  field type is: {x[1]} field maximum length is: {x[2]}\n'
+                            record.append(input(s))
+
+                        if dataObj.insert_record(record):  # add a row
+                            print(f'\033[32mupdate record success!\033[0m')
+                            dataObj.show_table_data()  # view all the data of the table
+                        else:
+                            print(f'\033[31mupdate record fail!\033[0m')
+                    else:
+                        print(f'\033[31mdelete old record fail!\033[0m')
+
+                    del dataObj
+                else:
+                    print(f'\033[33mtable name is None\033[0m')
 
             choice = input(PROMPT_STR)
 
@@ -202,7 +226,7 @@ def main():
             break
 
         else:
-            print('Wrong input! Please input again!')
+            print(f'\033[31mWrong input! Please input again!\033[0m')
             choice = input(PROMPT_STR)
 
     print('main loop finish!')

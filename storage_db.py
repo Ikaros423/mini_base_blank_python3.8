@@ -1,6 +1,7 @@
 # -----------------------------------------------------------------------
 # storage_db.py
 # Author: Jingyu Han  hjymail@163.com
+# modified by: Chenhui Zhang
 # -----------------------------------------------------------------------
 # the module is to store tables in files
 # Each table is stored in a separate file with the suffix ".dat".
@@ -262,6 +263,7 @@ class Storage(object):
         inputstr = ''.join(insert_record)
 
         self.record_list.append(tuple(tmpRecord))
+        self.delete_flag_list.append(False)  # 新记录未删除标记为False
 
         # Step3: To calculate MaxNum in each Data Blocks
         record_content_len = len(inputstr)
@@ -350,7 +352,6 @@ class Storage(object):
             print(f'\033[31m未找到字段名 {fname.decode()}\033[0m')
             return False
 
-        deleted_count = 0
         # 遍历所有记录
         for i, rec in enumerate(self.record_list):
             if rec is None:  # 跳过已删除的记录
@@ -366,15 +367,10 @@ class Storage(object):
                 self.f_handle.seek(BLOCK_SIZE * block_id + offset + struct.calcsize('!ii10s'))
                 self.f_handle.write(struct.pack('!i', 1))  # 1表示已删除
                 self.delete_flag_list[i] = True  # 更新内存中的删除标记
-                deleted_count += 1
-
-        if deleted_count > 0:
-            print(f'\033[32m成功删除 {deleted_count} 条记录\033[0m')
-            self.f_handle.flush()
-            return True
-        else:
-            print('\033[33m未找到匹配的记录\033[0m')
-            return False
+                return True  # 删除成功
+           
+        print(f'\033[31m未找到匹配的记录\033[0m')
+        return False
 
     def show_table_data(self):
         print('|    '.join(map(lambda x: x[0].decode('utf-8').strip(), self.field_name_list)))  # show the structure
