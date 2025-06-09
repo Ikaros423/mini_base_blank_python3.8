@@ -246,7 +246,7 @@ class Storage(object):
             if self.field_name_list[idx][1] == 0 or self.field_name_list[idx][1] == 1:
                 if len(insert_record[idx]) > self.field_name_list[idx][2]:
                     return False
-                tmpRecord.append(insert_record[idx])
+                tmpRecord.append(tool.tryToBytes(insert_record[idx])) # convert to bytes
             if self.field_name_list[idx][1] == 2:
                 try:
                     tmpRecord.append(int(insert_record[idx]))

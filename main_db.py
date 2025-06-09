@@ -80,6 +80,7 @@ def main():
 
         elif choice == '2':  # delete a table from schema file and data file
 
+            schemaObj.viewTableNames()  # view all the table names in the schema file
             table_name = input(f'\033[34mplease input the name of the table to be deleted:\033[0m')
             if isinstance(table_name,str):
                 table_name=table_name.encode('utf-8')
