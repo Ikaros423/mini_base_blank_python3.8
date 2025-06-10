@@ -14,6 +14,8 @@ import os
 import head_db  # the main memory structure of table schema
 import schema_db  # the module to process table schema
 import storage_db  # the module to process the storage of instance
+import log_db  # the module to process the transaction log, which is stored in binary format
+import transaction_db  # the module to process the transaction
 
 import query_plan_db  # for SQL clause of which data is stored in binary format
 import lex_db  # for lex, where data is stored in binary format
@@ -34,6 +36,16 @@ def main():
     # main loops for the whole program
     print('main function begins to execute')
 
+    # --- 1. 初始化日志和事务管理器 ---
+    log_manager = log_db.LogManager()
+    
+    # --- 2. 系统启动时执行恢复 (关键步骤) ---
+    # 这将确保数据库从任何潜在的崩溃中恢复到一致的状态
+    log_manager.recover()
+
+    # --- 3. 初始化事务管理器 ---
+    transaction_manager = transaction_db.TransactionManager(log_manager)
+
     # The instance data of table is stored in binary format, which corresponds to chapter 2-8 of textbook
 
     schemaObj = schema_db.Schema()  # to create a schema object, which contains the schema of all tables
@@ -43,100 +55,134 @@ def main():
     while True:
 
         if choice == '1':  # add a new table and lines of data
-            tableName = input(f'\033[34mplease enter your new table name:\033[0m')
-            if isinstance(tableName, str):
-                tableName = tableName.encode('utf-8')
-            #  tableName not in all.sch
-            insertFieldList = []
-            if tableName.strip() not in schemaObj.get_table_name_list():
-                # Create a new table
-                dataObj = storage_db.Storage(tableName)
+            tx_id = None
+            try:
+                # --- 开始事务 ---
+                tx_id = transaction_manager.begin_transaction()
 
-                insertFieldList = dataObj.getFieldList()
+                tableName = input(f'\033[34mplease enter your new table name:\033[0m')
+                if isinstance(tableName, str):
+                    tableName = tableName.encode('utf-8')
+                
+                # 创建 Storage 实例时传入 log_manager
+                # 模式修改本身也应该是事务性的，但为简化，此处只将数据插入设为事务性
+                dataObj = storage_db.Storage(tableName, log_manager)
 
-                schemaObj.appendTable(tableName, insertFieldList)  # add the table structure
-            else:
-                dataObj = storage_db.Storage(tableName)
+                #  tableName not in all.sch
+                insertFieldList = []
+                if tableName.strip() not in schemaObj.get_table_name_list():
 
-                # to the students: The following needs to be further implemented (many lines can be added)
-                record = []
-                Field_List = dataObj.getFieldList()
-                for x in Field_List:
-                    s = f'Input field name is: {x[0].strip()}  field type is: {x[1]} field maximum length is: {x[2]}\n'
-                    record.append(input(s))
-
-                if dataObj.insert_record(record):  # add a row
-                    print(f'\033[32mOK!\033[0m')
+                    insertFieldList = dataObj.getFieldList()
+                    schemaObj.appendTable(tableName, insertFieldList)  # add the table structure
+                    print(f'\033[32mTable schema created.\033[0m')
                 else:
-                    print(f'\033[31mWrong input!\033[0m')
+                    # to the students: The following needs to be further implemented (many lines can be added)
+                    record = []
+                    Field_List = dataObj.getFieldList()
+                    for x in Field_List:
+                        s = f'Input field name is: {x[0].strip()}  field type is: {x[1]} field maximum length is: {x[2]}\n'
+                        record.append(input(s))
 
-                del dataObj
+                    # 传递事务ID
+                    if dataObj.insert_record(record, tx_id):
+                        print(f'\033[32mRecord prepared for insertion.\033[0m')
+                    else:
+                        raise Exception("Wrong input for record!")
 
-            choice = input(PROMPT_STR)
+                # --- 提交事务 ---
+                transaction_manager.commit(tx_id)
+                print(f'\033[32mTransaction {tx_id} committed successfully!\033[0m')
 
-
-
+            except Exception as e:
+                print(f'\033[31mError: {e}\033[0m')
+                if tx_id:
+                    # --- 中止事务 ---
+                    transaction_manager.abort(tx_id)
+                    print(f'\033[31mTransaction {tx_id} aborted and rolled back.\033[0m')
+            finally:
+                if dataObj:
+                    del dataObj
+                choice = input(PROMPT_STR)
 
 
         elif choice == '2':  # delete a table from schema file and data file
+            tx_id = None
+            try:
+                schemaObj.viewTableNames()  # view all the table names in the schema file
+                table_name = input(f'\033[34mplease input the name of the table to be deleted:\033[0m')
+                if isinstance(table_name,str):
+                    table_name=table_name.encode('utf-8')
+                if schemaObj.find_table(table_name.strip()):
+                    # --- 开始事务 ---
+                    tx_id = transaction_manager.begin_transaction()  
 
-            table_name = input(f'\033[34mplease input the name of the table to be deleted:\033[0m')
-            if isinstance(table_name,str):
-                table_name=table_name.encode('utf-8')
-            if schemaObj.find_table(table_name.strip()):
-                if schemaObj.delete_table_schema(
-                        table_name):  # delete the schema from the schema file
-                    dataObj = storage_db.Storage(table_name)  # create an object for the data of table
-                    dataObj.delete_table_data(table_name.strip())  # delete table content from the table file
-                    del dataObj
+                    # 假设 delete_table_schema 方法和 delete_table_data 方法都支持事务
+                    if schemaObj.delete_table_schema(table_name):  # delete the schema from the schema file
+                        dataObj = storage_db.Storage(table_name, log_manager)  # create an object for the data of table
+                        dataObj.delete_table_data(table_name.strip())  # delete table content from the table file
+                        del dataObj
+
+                        transaction_manager.commit(tx_id)
+                        print(f'\033[32mTable {table_name.decode()} and its data deleted. Transaction {tx_id} committed.\033[0m')
+
+                    else:
+                        raise Exception("Deletion from schema file failed!")
 
                 else:
-                    print(f'\033[31mthe deletion from schema file fail\033[0m')
+                    print(f'\033[31mthere is no table {table_name} in the schema file\033[0m')
 
-
-            else:
-                print(f'\033[31mthere is no table {table_name} in the schema file\033[0m')
-
-
-            choice = input(PROMPT_STR)
-
+            except Exception as e:
+                print(f'\033[31mError: {e}\033[0m')
+                if tx_id:
+                    transaction_manager.abort(tx_id)
+                    print(f'\033[31mTransaction {tx_id} aborted.\033[0m')
+            finally:
+                choice = input(PROMPT_STR)
 
 
         elif choice == '3':  # view the table structure and all the data
 
-            schemaObj.viewTableNames() # view all the table names in the schema file
-            table_name = input(f'\033[34mplease input the name of the table to be displayed:\033[0m')
-            if isinstance(table_name,str):
-                table_name=table_name.encode('utf-8')
-            if table_name.strip():
-                if schemaObj.find_table(table_name.strip()):
-                    schemaObj.viewTableStructure(table_name)  # to be implemented
+            if len(schemaObj.get_table_name_list()) > 0:
+                schemaObj.viewTableNames() # view all the table names in the schema file
+                table_name = input(f'\033[34mplease input the name of the table to be displayed:\033[0m')
+                if isinstance(table_name,str):
+                    table_name=table_name.encode('utf-8')
+                if table_name.strip():
+                    if schemaObj.find_table(table_name.strip()):
+                        schemaObj.viewTableStructure(table_name)  # to be implemented
 
-                    dataObj = storage_db.Storage(table_name)  # create an object for the data of table
-                    dataObj.show_table_data()  # view all the data of the table
-                    del dataObj
-                else:
-                    print(f'\033[31mtable name is None\033[0m')
+                        dataObj = storage_db.Storage(table_name)  # create an object for the data of table
+                        dataObj.show_table_data()  # view all the data of the table
+                        del dataObj
+                    else:
+                        print(f'\033[31mtable name is None\033[0m')
+            else:
+                print(f'\033[31mThere is no table in the schema file\033[0m')
 
             choice = input(PROMPT_STR)
-
 
 
         elif choice == '4':  # delete all the table structures and their data
-            table_name_list = list(schemaObj.get_table_name_list())
-            # to be inserted here -> to delete from data files
-            for i in range(len(table_name_list)):
-                table_name = table_name_list[i]
-                table_name.strip()
-
-                if table_name:
-                    stObj = storage_db.Storage(table_name)
-                    stObj.delete_table_data(table_name.strip())  # delete table data
-                    del stObj
-
-            schemaObj.deleteAll()  # delete schema from schema file
-
-            choice = input(PROMPT_STR)
+            tx_id = None
+            try:
+                tx_id = transaction_manager.begin_transaction()
+                table_name_list = schemaObj.get_table_name_list()
+                for table_name in table_name_list:
+                    table_name = table_name.strip()
+                    if table_name:
+                        stObj = storage_db.Storage(table_name, log_manager)
+                        stObj.delete_table_data(table_name)
+                        del stObj
+                schemaObj.deleteAll() # 模式修改
+                transaction_manager.commit(tx_id)
+                print(f'\033[32mAll tables deleted. Transaction {tx_id} committed.\033[0m')
+            except Exception as e:
+                print(f'\033[31mError: {e}\033[0m')
+                if tx_id:
+                    transaction_manager.abort(tx_id)
+                    print(f'\033[31mTransaction {tx_id} aborted.\033[0m')
+            finally:
+                choice = input(PROMPT_STR)
 
         elif choice == '5':  # process SELECT FROM WHERE clause
             print('#        Your Query is to SQL QUERY                  #')
@@ -191,72 +237,89 @@ def main():
             choice = input(PROMPT_STR)
 
         elif choice == '6':  # delete a line of data from the storage file given the keyword
+            tx_id = None
+            try:
+                schemaObj.viewTableNames()
+                table_name = input(f'\033[34mplease input the name of the table to be deleted from:\033[0m')
+                if isinstance(table_name,str):
+                    table_name=table_name.encode('utf-8')
+                
+                if table_name.strip() and schemaObj.find_table(table_name.strip()):
+                    dataObj = storage_db.Storage(table_name, log_manager)
+                    dataObj.show_table_data()
 
-            schemaObj.viewTableNames() # view all the table names in the schema file
-            table_name = input(f'\033[34mplease input the name of the table to be deleted from:\033[0m')
-
-            # to the students: to be inserted here, delete the line from data files
-            if isinstance(table_name,str):
-                table_name=table_name.encode('utf-8')
-            if table_name.strip():
-                if schemaObj.find_table(table_name.strip()):
-                    dataObj = storage_db.Storage(table_name)  # create an object for the data of table
-                    dataObj.show_table_data()  # view all the data of the table
-
-                    field_keyword = input(f'\033[34mplease input the field name and the corresponding keyword (fieldname:keyword):\033[0m')
-                    if dataObj.delete_record(field_keyword):
-                        print(f'\033[32mdelete record success!\033[0m')
-                        dataObj.show_table_data()  # view all the data of the table
+                    field_keyword = input(f'\033[34mplease input the field name and the corresponding keyword (\033[33mfieldname:keyword\033[34m):\033[0m')
+                    
+                    tx_id = transaction_manager.begin_transaction()
+                    if dataObj.delete_record(field_keyword, tx_id):
+                        transaction_manager.commit(tx_id)
+                        print(f'\033[32mDelete record success! Transaction {tx_id} committed.\033[0m')
+                        dataObj.show_table_data()
                     else:
-                        print(f'\033[31mdelete record fail!\033[0m')
-
+                        raise Exception("Record not found or delete failed.")
                     del dataObj
                 else:
-                    print(f'\033[33mtable name is None\033[0m')
-
-            choice = input(PROMPT_STR)
+                    print(f'\033[33mTable name is None or does not exist\033[0m')
+            except Exception as e:
+                print(f'\033[31mError: {e}\033[0m')
+                if tx_id:
+                    transaction_manager.abort(tx_id)
+                    print(f'\033[31mTransaction {tx_id} aborted.\033[0m')
+            finally:
+                choice = input(PROMPT_STR)
 
 
         elif choice == '7':  # update a line of data given the keyword
+            tx_id = None
+            try:
+                schemaObj.viewTableNames()
+                table_name = input(f'\033[34mplease input the name of the table:\033[0m')
+                if isinstance(table_name, str):
+                    table_name = table_name.encode('utf-8').strip()
 
-            schemaObj.viewTableNames()  # view all the table names in the schema file
-            table_name = input(f'\033[34mplease input the name of the table:\033[0m')
-            if isinstance(table_name, str):
-                table_name = table_name.encode('utf-8').strip()
-                if schemaObj.find_table(table_name.strip()):
-                    dataObj = storage_db.Storage(table_name)
+                if table_name and schemaObj.find_table(table_name):
+                    dataObj = storage_db.Storage(table_name, log_manager)
                     dataObj.show_table_data()
-                    field_keyword = input(f'\033[34mplease input the field name and the corresponding keyword (fieldname:keyword):\033[0m')
-                    if dataObj.delete_record(field_keyword):  # delete the record first
-                        print(f'\033[32mdelete old record success!\033[0m')
+                    field_keyword = input(f'\033[34mplease input the field name and the corresponding keyword (\033[33mfieldname:keyword\033[34m):\033[0m')
+                    
+                    tx_id = transaction_manager.begin_transaction()
+                    # 1. 执行删除
+                    if not dataObj.delete_record(field_keyword, tx_id):
+                        raise Exception("Old record not found for update.")
+                    print(f'\033[32mOld record marked for deletion in transaction {tx_id}.\033[0m')
 
-                        record = []
-                        Field_List = dataObj.getFieldList()
-                        print(f'\033[34mPlease input the new record data:\033[0m')
-                        for x in Field_List:
-                            s = f'Input field name is: {x[0].strip()}  field type is: {x[1]} field maximum length is: {x[2]}\n'
-                            record.append(input(s))
+                    # 2. 执行插入
+                    record = []
+                    Field_List = dataObj.getFieldList()
+                    print(f'\033[34mPlease input the new record data:\033[0m')
+                    for x in Field_List:
+                        s = f'Input field name is: {x[0].strip()}  field type is: {x[1]} field maximum length is: {x[2]}\n'
+                        record.append(input(s))
 
-                        if dataObj.insert_record(record):  # add a row
-                            print(f'\033[32mupdate record success!\033[0m')
-                            dataObj.show_table_data()  # view all the data of the table
-                        else:
-                            print(f'\033[31mupdate record fail!\033[0m')
-                    else:
-                        print(f'\033[31mdelete old record fail!\033[0m')
-
+                    if not dataObj.insert_record(record, tx_id):
+                        raise Exception("New record insertion failed.")
+                    
+                    # 3. 提交整个事务
+                    transaction_manager.commit(tx_id)
+                    print(f'\033[32mUpdate success! Transaction {tx_id} committed.\033[0m')
+                    dataObj.show_table_data()
                     del dataObj
                 else:
-                    print(f'\033[33mtable name is None\033[0m')
-
-            choice = input(PROMPT_STR)
-
+                    print(f'\033[33mTable name is None or does not exist\033[0m')
+            except Exception as e:
+                print(f'\033[31mError: {e}\033[0m')
+                if tx_id:
+                    transaction_manager.abort(tx_id)
+                    print(f'\033[31mTransaction {tx_id} aborted.\033[0m')
+            finally:
+                choice = input(PROMPT_STR)
 
 
         elif choice == '.':
             print('main loop finishies')
             del schemaObj
             break
+
 
         else:
             print(f'\033[31mWrong input! Please input again!\033[0m')

@@ -304,7 +304,7 @@ class Schema(object):
             self.headObj.offsetOfBody += fieldNum * MAX_FIELD_LEN
             self.headObj.tableNames.append(nameContent)
             # fieldTuple = tuple(fieldList)
-            tableName = tool.tryToStr(tableName)  # convert to string if it is bytes
+            tableName = tool.tryToBytes(tableName)  # convert to bytes if it is string
             self.headObj.tableFields[tableName]=fieldList
 
     # -------------------------------
@@ -412,4 +412,4 @@ class Schema(object):
     #       table_name_list: the returned list of table names
     # --------------------------------
     def get_table_name_list(self):
-        return map(lambda x:x[0],self.headObj.tableNames)
+        return list(map(lambda x:x[0],self.headObj.tableNames))
