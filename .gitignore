@@ -1,5 +1,7 @@
 # 排除文件
 *.dat
+*.pyc
+*.log
 
 # 排除文件夹
 /__pycache__
