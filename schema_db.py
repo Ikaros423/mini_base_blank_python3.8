@@ -412,4 +412,4 @@ class Schema(object):
     #       table_name_list: the returned list of table names
     # --------------------------------
     def get_table_name_list(self):
-        return map(lambda x:x[0],self.headObj.tableNames)
+        return list(map(lambda x:x[0],self.headObj.tableNames))
