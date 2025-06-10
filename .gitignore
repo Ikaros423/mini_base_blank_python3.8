@@ -3,3 +3,4 @@
 
 # 排除文件夹
 /__pycache__
+/.vscode
