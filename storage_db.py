@@ -1,7 +1,7 @@
 # -----------------------------------------------------------------------
 # storage_db.py
 # Author: Jingyu Han  hjymail@163.com
-# modified by: Chenhui Zhang
+# modified by: Chenhui Zhang zch13773103716@163.com
 # -----------------------------------------------------------------------
 # the module is to store tables in files
 # Each table is stored in a separate file with the suffix ".dat".
