@@ -170,15 +170,6 @@ def p_expr_condition(t):
     '''Cond : Expression
             | Expression AND Expression'''
 
-    '''Cond : TCNAME EQX CONSTANT
-            (equivalent to Expression) '''
-    '''
-    t[1] = common_db.Node('TCNAME', [t[1]])
-    t[2] = common_db.Node('=', None)
-    t[3] = common_db.Node('CONSTANT', [t[3]])
-
-    t[0] = common_db.Node('Cond', [t[1], t[2], t[3]])
-    '''
 
     if len(t) == 2:  # 单个表达式
         t[0] = t[1]
@@ -195,8 +186,6 @@ def p_expr_condition(t):
 # output:
 #       the error messages
 # --------------------------------------
-'''def p_error(t):
-    print('wrong at %s' % t.value)'''
 def p_error(p):
     if p:
         print(f"Syntax error at token '{p.value}' (type: {p.type})")
@@ -225,26 +214,5 @@ def p_expr_expression(t):
         common_db.Node('OP', [t[2]]),
         common_db.Node('VALUE', [t[3]])
     ])
-
-# the following is to test
-'''
-# the following is to test
-my_str="select f1,f2 from t1,t2 where f1=9"
-my_parser=yacc.yacc(write_tables=0)# the tabl does not cache
-my_parser.parse(my_str)
-'''
-
-
-def test_lexer():
-    lexer = lex.lex()
-    data = "select test from Test"
-    lexer.input(data)
-
-    print("Tokenizing:", data)
-    while True:
-        tok = lexer.token()
-        if not tok:
-            break
-        print(tok)
 
 

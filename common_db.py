@@ -42,11 +42,10 @@ def show(node_obj):
     if isinstance(node_obj, str):  # it is a string object
         print(node_obj)
 
-
+    # ----------------------
+    # 改进的树形结构显示函数
+    # ----------------------
 def show(node_obj, level=0, prefix=''):
-    """
-    改进的树形结构显示函数
-    """
     indent = "    " * level
 
     if isinstance(node_obj, Node):

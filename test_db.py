@@ -10,7 +10,6 @@ def test_committed_transaction_survives_crash():
     log_manager = log_db.LogManager()
     transaction_manager = transaction_db.TransactionManager(log_manager)
     
-    # 假设我们要操作的表名为 'mytable'
     table_name = b'mytable' 
     storage = storage_db.Storage(table_name, log_manager)
 
@@ -19,11 +18,11 @@ def test_committed_transaction_survives_crash():
     print(f"Transaction {tx_id} started.")
 
     # 3. 准备并执行插入操作
-    new_record = ['value1', '123', 'True'] # 示例记录
+    new_record = ['value1', '123', 'True'] 
     print(f"Inserting record: {new_record}")
     storage.insert_record(new_record, tx_id)
     
-    # 4. 提交事务 (日志会在此刻被持久化)
+    # 4. 提交事务 
     transaction_manager.commit(tx_id)
     print(f"Transaction {tx_id} committed.")
 
@@ -43,10 +42,10 @@ def test_uncommitted_transaction_rolls_back():
 
     new_record = ['value2', '999', 'False']
     print(f"Inserting uncommitted record: {new_record}")
-    storage.insert_record(new_record, tx_id) # 日志已写入，数据文件可能也已被修改("脏数据")
+    storage.insert_record(new_record, tx_id) # 日志已写入，数据文件可能也已被修改
     storage.show_table_data()  # 显示当前表数据
     
-    # 这里没有 commit() 调用
+    # 没有 commit() 调用
     
     print("--- SIMULATING CRASH before commit ---")
     os._exit(1)

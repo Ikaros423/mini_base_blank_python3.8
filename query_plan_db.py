@@ -193,143 +193,7 @@ def construct_select_node(wf_node, sel_list):
 # ---------------------------------------------
 # Has been modified.
 def execute_logical_tree():
-    """if common_db.global_logical_tree:
-        def excute_tree():
-
-            idx = 0
-            dict_ = {}
-
-            def show(node_obj, idx, dict_):
-                if isinstance(node_obj, common_db.Node):  # it is a Node object
-                    dict_.setdefault(idx, [])
-                    dict_[idx].append(node_obj.value)
-                    if node_obj.var:
-                        dict_[idx][-1] = tuple((dict_[idx][-1], node_obj.var))
-                    if node_obj.children:
-                        for i in range(len(node_obj.children)):
-                            show(node_obj.children[i], idx + 1, dict_)
-
-            show(common_db.global_logical_tree, idx, dict_)
-            idx = sorted(dict_.keys(), reverse=True)[0]
-
-            def GetFilterParam(tableName_Order, current_field, param):
-                # print tableName_Order,current_field
-                if '.' in param:
-                    tableName = param.split('.')[0]
-                    FieldName = param.split('.')[1]
-                    if tableName in tableName_Order:
-                        TableIndex = tableName_Order.index(tableName)
-                elif len(tableName_Order) == 1:
-                    TableIndex = 0
-                    FieldName = param
-                else:
-                    return 0, 0, 0, False
-                tmp = list(map(lambda x: x[0].strip(), current_field[TableIndex]))
-                if FieldName in tmp:
-                    FieldIndex = tmp.index(FieldName)
-                    FieldType = current_field[TableIndex][FieldIndex][1]
-                    return TableIndex, FieldIndex, FieldType, True
-                else:
-                    return 0, 0, 0, False
-
-            current_field = []
-            current_list = []
-            # print dict_
-            while (idx >= 0):
-                if idx == sorted(dict_.keys(), reverse=True)[0]:
-                    if len(dict_[idx]) > 1:
-                        a_1 = storage_db.Storage(dict_[idx][0])
-                        a_2 = storage_db.Storage(dict_[idx][1])
-                        current_list = []
-                        tableName_Order = [dict_[idx][0], dict_[idx][1]]
-                        current_field = [a_1.getfilenamelist(), a_2.getfilenamelist()]
-                        for x in itertools.product(a_1.getRecord(), a_2.getRecord()):
-                            current_list.append(list(x))
-                    else:
-                        a_1 = storage_db.Storage(dict_[idx][0])
-                        current_list = a_1.getRecord()
-
-                        tableName_Order = [dict_[idx][0]]
-                        current_field = [a_1.getfilenamelist()]
-                        # print current_list
-
-                elif 'X' in dict_[idx] and len(dict_[idx]) > 1:
-                    a_2 = storage_db.Storage(dict_[idx][1])
-                    tableName_Order.append(dict_[idx][1])
-                    current_field.append(a_2.getfilenamelist())
-                    tmp_List = current_list[:]
-                    current_list = []
-                    for x in itertools.product(tmp_List, a_2.getRecord()):
-                        current_list.append(list((x[0][0], x[0][1], x[1])))
-
-                elif 'X' not in dict_[idx]:
-                    if 'Filter' in dict_[idx][0]:
-                        FilterChoice = dict_[idx][0][1]
-                        TableIndex, FieldIndex, FieldType, isTrue = GetFilterParam(tableName_Order, current_field,
-                                                                                   FilterChoice[0])
-                        if not isTrue:
-                            return [], [], False
-                        else:
-                            if FieldType == 2:
-                                FilterParam = int(FilterChoice[2].strip())
-                            elif FieldType == 3:
-                                FilterParam = bool(FilterChoice[2].strip())
-                            else:
-                                FilterParam = FilterChoice[2].strip()
-                            # print FilterParam
-                        tmp_List = current_list[:]
-                        current_list = []
-                        for tmpRecord in tmp_List:
-                            if len(current_field) == 1:
-                                ans = tmpRecord[FieldIndex]
-                            else:
-                                ans = tmpRecord[TableIndex][FieldIndex]
-                            if FieldType == 0 or FieldType == 1:
-                                ans = ans.strip()
-                            if FilterParam == ans:
-                                current_list.append(tmpRecord)
-
-                    if 'Proj' in dict_[idx][0]:
-                        SelIndexList = []
-                        for i in range(len(dict_[idx][0][1])):
-                            TableIndex, FieldIndex, FieldType, isTrue = GetFilterParam(tableName_Order, current_field,
-                                                                                       dict_[idx][0][1][i])
-                            if not isTrue:
-                                return [], [], False
-                            SelIndexList.append((TableIndex, FieldIndex))
-                        tmp_List = current_list[:]
-                        current_list = []
-                        # print SelIndexList,current_field
-                        for tmpRecord in tmp_List:
-                            # print tmpRecord
-                            if len(current_field) == 1:
-                                tmp = []
-                                for x in list(map(lambda x: x[1], SelIndexList)):
-                                    tmp.append(tmpRecord[x])
-                                current_list.append(tmp)
-                            else:
-                                tmp = []
-                                for x in SelIndexList:
-                                    tmp.append(tmpRecord[x[0]][x[1]])
-                                current_list.append(tmp)
-                        outPutField = []
-                        for xi in SelIndexList:
-                            outPutField.append(
-                                tableName_Order[xi[0]].strip() + '.' + current_field[xi[0]][xi[1]][0].strip())
-                        return outPutField, current_list, True
-                idx -= 1
-
-        outPutField, current_list, isRight = excute_tree()
-
-        if isRight:
-            print(outPutField)
-            for record in current_list:
-                print(record)
-        else:
-            print('WRONG SQL INPUT!')
-    else:
-        print('there is no query plan tree for the execution')
-    """
+    
     if not common_db.global_logical_tree:
         print('No logical tree to execute')
         return
@@ -418,6 +282,7 @@ def execute_logical_tree():
                     try:
                         # value = tool.tryToStr(value)
                         field_value = tool.tryToStr(field_value)
+                        value = tool.convertType(field_value, value)
                     except:
                         pass
                 elif field_type == 3:  # bool
@@ -510,26 +375,6 @@ def execute_logical_tree():
 # ---------------------------------
 # Has Been Modified .
 def construct_logical_tree():
-    """
-    if syn_tree:
-        sel_list, from_list, where_list = extract_sfw_data()
-        sel_list = [i for i in sel_list if i != ',']
-        from_list = [i for i in from_list if i != ',']
-       where_list = tuple(where_list)
-        # print sel_list,from_list,where_list
-
-        from_node = construct_from_node(from_list)
-        where_node = construct_where_node(from_node, where_list)
-        common_db.global_logical_tree = construct_select_node(where_node, sel_list)
-
-        # if common_db.global_logical_tree:
-        #    common_db.show(common_db.global_logical_tree)
-
-
-    else:
-        print('there is no data in the syntax tree in the construct_logical_tree')
-
-    """
 
     syn_tree = common_db.global_syn_tree
     if syn_tree:
@@ -619,14 +464,3 @@ def extract_children(nodeobj, result_list):
         if nodeobj != ',':
             result_list.append(nodeobj)
 
-
-'''
-# the following is to test the code
-from_list1=['a','b','c','d','e','f','g']
-tree_from=construct_from_node(from_list1)
-where_list1=[('x.c','=','y.c'),('z','=','w')]
-tree_where=construct_where_node(tree_from,where_list1)
-sel_list1=['f1','f2']
-syn_tree=construct_select_node(tree_where,sel_list1)
-print extract_sfw_data()
-'''

@@ -558,7 +558,6 @@ class Storage(object):
             struct.pack_into('!i', block_buffer, slot_array_pos, record_offset_in_block)
 
             # 7. 更新块头中的记录数
-            # 假设slot_id是连续的，所以新记录数是 slot_id + 1
             new_record_count = slot_id + 1
             struct.pack_into('!ii', block_buffer, 0, block_id, new_record_count)
 

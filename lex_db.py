@@ -111,19 +111,7 @@ def set_lex_handle():
 
 
 t_ignore = ' \t\n'  # 直接忽略空白符
-'''
-def test():
-    my_lexer=lex.lex()
-    my_lexer.input("select f1,f2 from GOOD where f1='xx' and f2=5 ")
-    while True:
-        temp_tok=my_lexer.token()
-        if temp_tok is None:
-            break
-        print temp_tok
 
-
-test()
-'''
 
 def tokenize_sql(sql):
     lexer = lex.lex()

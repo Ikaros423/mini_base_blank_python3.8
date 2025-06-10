@@ -184,25 +184,11 @@ def main():
             finally:
                 choice = input(PROMPT_STR)
 
+
         elif choice == '5':  # process SELECT FROM WHERE clause
             print('#        Your Query is to SQL QUERY                  #')
             sql_str = input(f'\033[34mplease enter the select from where clause:\033[0m')
 
-            ''' 
-            lex_db.set_lex_handle()  # to set the global_lexer in common_db.py
-            parser_db.set_handle()  # to set the global_parser in common_db.py
-
-            try:
-                common_db.global_syn_tree = common_db.global_parser.parse(sql_str.strip(),
-                                                                          lexer=common_db.global_lexer)  # construct the global_syn_tree
-                #reload(query_plan_db)
-                query_plan_db.construct_logical_tree()
-                query_plan_db.execute_logical_tree()
-            except:
-                print(f'\033[31mWRONG SQL INPUT!\033[0m')
-            print('#----------------------------------------------------#')
-            choice = input(PROMPT_STR)
-            '''
             lex_db.set_lex_handle()
             parser_db.set_handle()
             common_db.global_syn_tree = None
@@ -233,8 +219,9 @@ def main():
             except Exception as e:
                 print(f'Error processing SQL: {str(e)}')
 
-            print('#----------------------------------------------------#')
-            choice = input(PROMPT_STR)
+            finally:
+                print('#----------------------------------------------------#')
+                choice = input(PROMPT_STR)
 
         elif choice == '6':  # delete a line of data from the storage file given the keyword
             tx_id = None
