@@ -282,7 +282,6 @@ def execute_logical_tree():
                     try:
                         # value = tool.tryToStr(value)
                         field_value = tool.tryToStr(field_value)
-                        value = tool.convertType(field_value, value)
                     except:
                         pass
                 elif field_type == 3:  # bool
